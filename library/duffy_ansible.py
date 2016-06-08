@@ -81,55 +81,84 @@ class Duffy:
     def __init__(self):
         pass
 
+    def deallocate(self):
+        b=urllib.urlopen(self.done_url).read()
+
+        return {'status': b}
+
     def allocate(self):
-        b=json.load(urllib.urlopen(get_nodes_url))
+        url=urllib.urlopen(self.get_url)
+
+        try:
+            b=json.load(url)
+        except ValueError as e:
+            raise Exception("The URL '{}' is malformed".format(self.get_url))
+
+#        b={"hosts": ["n58.dusty.ci.centos.org", "n62.dusty.ci.centos.org"], "ssid": "e1c2d56e"}
         hosts=b['hosts']
         ssid=b['ssid']
-        print("Allocated {} hosts with DUFFY_SSID={}".format(len(hosts), ssid))
-#        return hosts, ssid
+
+        return hosts, ssid
 
     def execute(self, module):
 
+        json_output = {}
         state = module.params['state']
+        url_base="http://admin.ci.centos.org:8080"
+        api_key=open(os.path.expanduser(module.params['key_path'])).read().strip()
 
         # allocate some systems if state is 'present' :)
         if state == 'present':
 
-            url_base="http://admin.ci.centos.org:8080"
-            api_key=open(os.path.expanduser(module.params['key_path'])).read().strip()
             ver=module.params['version']
             arch=module.params['arch']
-            count=module.params['arch']
+            count=module.params['count']
 
             self.get_url="{0}/Node/get?key={1}&ver={2}&arch={3}&count={4}".format(url_base,api_key,ver,arch,count)
+            (hosts, ssid) = self.allocate()
+            json_output['hosts'] = hosts
+            json_output['ssid'] = ssid
 
-#            self.allocate()
+            return json_output
+        elif state == 'absent':
 
+            if not module.params.get('ssid'):
+                module.fail_json(msg=str("The 'ssid' parameter is required."))
 
-        module.exit_json(changed=True)
+            ssid=module.params['ssid']
 
+            self.done_url="{0}/Node/done?key={1}&ssid={2}".format(url_base,api_key,ssid)
+            return self.deallocate()
 
 def main():
 
     module = AnsibleModule(
         argument_spec=dict(
             name = dict(type='str'),
-            state = dict(choices=['present', 'absent'], default='present'),
-            group = dict(default=None, type='str'),
+            state = dict(choices=['present', 'status', 'absent']),
             count = dict(default=1, type='int'),
+            ssid = dict(default=None, type='str'),
             version = dict(default=7, type='int'),
             arch = dict(default='x86_64', type='str'),
             key_path = dict(default='~/duffy.key', type='str'),
         ),
     )
 
-    groupname = module.params.get('group')
-    if groupname is None:
-        module.params['group'] = module.params['name']
 
     try:
         d = Duffy()
-        d.execute(module)
+        execute_output = d.execute(module)
+
+        json_output = {}
+        hosts = execute_output.get('hosts')
+        status = execute_output.get('status')
+        if hosts or status is not None:
+            json_output['changed'] = True
+            json_output.update(execute_output)
+        else:
+            json_output['changed'] = False
+
+        module.exit_json(**json_output)
     except Exception as e:
         module.fail_json(msg=str(e))
 
