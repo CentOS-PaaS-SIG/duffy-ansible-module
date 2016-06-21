@@ -3,9 +3,9 @@
 #
 # Author: Clint Savage- @herlo <herlo1@gmail.com>
 #
-# Manage the spin up of duffy nodes.
+# Manage the spin up / teardown of Duffy nodes within CentOS CI environment.
 # See https://wiki.centos.org/QaWiki/CI/Duffy for more information about
-# duffy.
+# Duffy.
 #
 
 #---- Documentation Start ----------------------------------------------------#
@@ -55,17 +55,17 @@ author: Clint Savage - @herlo
 '''
 
 EXAMPLES = '''
-- name: "provision nodes in group herlo-ci"
+- name: "provision 4 nodes"
   duffy:
     state: present
     count: 4
-    group: herlo-ci
+  register: herlo-ci
 
-# teardown any nodes in group 'herlo-ci'
+# teardown any nodes in ssid '171303a0'
 - name: "teardown openshift nodes"
   duffy:
     state: absent
-    group: herlo-ci
+    ssid: {{ herlo-ci.ssid }}
 
 '''
 
@@ -82,17 +82,17 @@ class Duffy:
         pass
 
     def deallocate(self):
-        b=urllib.urlopen(self.done_url).read()
+        res=urllib.urlopen(self.done_url).read()
 
-        return {'status': b}
+        return {'status': res}
 
     def allocate(self):
-        url=urllib.urlopen(self.get_url)
+        res=urllib.urlopen(self.get_url)
 
         try:
-            b=json.load(url)
+            b=json.load(res)
         except ValueError as e:
-            raise Exception("The URL '{}' is malformed".format(self.get_url))
+            raise Exception("The URL '{0}' produced an error.".format(self.get_url))
 
 #        b={"hosts": ["n58.dusty.ci.centos.org", "n62.dusty.ci.centos.org"], "ssid": "e1c2d56e"}
         hosts=b['hosts']
@@ -143,7 +143,6 @@ def main():
             key_path = dict(default='~/duffy.key', type='str'),
         ),
     )
-
 
     try:
         d = Duffy()
