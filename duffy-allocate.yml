@@ -3,7 +3,7 @@
   gather_facts: False
   tasks:
   - name: "provision nodes"
-    duffy_ansible:
+    duffy:
       state: "present"
       count: 1
     register: daa
@@ -11,6 +11,6 @@
       var: daa
   - command: 'echo "ssid: {{ daa.ssid }} -- {{ daa.hosts }}"'
   - name: "teardown nodes from ssid"
-    duffy_ansible:
+    duffy:
       state: "absent"
       ssid: "{{ daa.ssid }}"
