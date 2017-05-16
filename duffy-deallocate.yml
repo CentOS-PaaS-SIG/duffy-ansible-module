@@ -1,0 +1,8 @@
+---
+- hosts: localhost
+  gather_facts: False
+  tasks:
+  - name: "teardown nodes from ssid"
+    duffy:
+      state: "absent"
+      ssid: "{{ ssid }}"
